@@ -33,8 +33,8 @@ func StoreFile (store KVStore, node Node, h hash.Hash) ([]byte, []byte){//返回
 	content := node.(File).Bytes()
 	t := []byte("blob")
 	if node.Size() > 256*1024 {
-		obj := Object{}
 		t = []byte("list")
+		obj := Object{}
 		n := node.Size()%256*1024
 		m := node.Size()/256*1024
 		if m>0 { n++ }
@@ -47,40 +47,23 @@ func StoreFile (store KVStore, node Node, h hash.Hash) ([]byte, []byte){//返回
 			content := content[start:end]
 			json_data := Object{Data: content}
 			value,_ := json.Marshal(json_data)
-			h.Reset()
-			key := h.Sum(value)
-			had,_ :=store.Has(key)
-			if  !had {
-				store.Put(key, value)
-			}
+			key := CalHash(h, value)
+			store.Put(key, value)
 			obj.Data=append(obj.Data,[]byte("blob")...)
 			obj.Links=append(obj.Links,Link{Hash:key,Size:end-start})
 		}
-/*
-
-
-
-
-
-
-*/
 		//将该文件存入kv中
 		json_data := Object{Data:obj.Data,Links: obj.Links}
 		value,_ := json.Marshal(json_data)
-		h.Reset()
-		key := h.Sum(value)
+		key := CalHash(h, value)
 		store.Put(key, value)
 		return key,t
 
 	}else{
 		json_data := Object{Data: content}
 		value,_ := json.Marshal(json_data)
-		h.Reset()
-		key := h.Sum(value)
-		had,_ :=store.Has(key)
-		if  !had {
-			store.Put(key, value)
-		}
+		key := CalHash(h, value)
+		store.Put(key, value)
 		return key,t
 	}
 
@@ -97,37 +80,30 @@ func StoreDir (store KVStore, node Node, h hash.Hash) []byte{
 		childnode := it.Node()
 		if childnode.Type() == FILE {
 			key,t := StoreFile(store, childnode, h)
-			tree.Data = append(tree.Data,t...)
-			tree.Links = append(tree.Links,Link{ Size:int(childnode.Size()), Hash: key})
+			tree.Data = append(tree.Data, t...)
+			tree.Links = append(tree.Links, Link{ Size: int(childnode.Size()), Hash: key})
 			value,_ := json.Marshal(tree)
-			h.Reset()
-			key = h.Sum(value)
-			had,_ :=store.Has(key)
-			if  !had {
-				store.Put(key, value)
-			}
-		}else if childnode.Type() ==DIR{
+			key = CalHash(h, value)
+			store.Put(key, value)
+		}else if childnode.Type() == DIR {
 			key := StoreDir(store, childnode, h)
 			t := "tree"
 			tree.Links = append(tree.Links, Link{Size: int(childnode.Size()),Name: childnode.Name(),Hash: key})
-			tree.Data = append(tree.Data,[]byte(t)...)
+			tree.Data = append(tree.Data, []byte(t)...)
 		}
 		value,_ := json.Marshal(tree)
-		h.Reset()
-		key := h.Sum(value)
-		had,_ :=store.Has(key)
-		if  !had {
-			store.Put(key, value)
-		}
+		key := CalHash(h, value)
+		store.Put(key, value)
 		return key
 	}
 	value,_ := json.Marshal(tree)
-	h.Reset()
-	key := h.Sum(value)
-	had,_ :=store.Has(key)
-	if  !had {
-		store.Put(key, value)
-	}
+	key :=CalHash(h, value)
+	store.Put(key, value)
 	return key
 }
 
+func CalHash (h hash.Hash, value []byte) []byte{
+	h.Reset()
+	key := h.Sum(value)
+	return key
+}
